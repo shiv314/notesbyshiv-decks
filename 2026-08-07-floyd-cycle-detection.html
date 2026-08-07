@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex">
+<title>Deck — Find the start of a linked list cycle</title>
+
+<style>
+  /* ── Deck surface. Deliberately single-theme: this is a filming surface,
+       not a document. It must look identical regardless of viewer theme,
+       because whatever is on screen becomes the reel. ── */
+
+  :root,
+  :root[data-theme="dark"],
+  :root[data-theme="light"] {
+    --ink:    #0E1116;
+    --panel:  #151A21;
+    --rule:   #232A33;
+    --fg:     #E8E6E1;
+    --dim:    #79828F;
+    --kw:     #E0A458;
+    --num:    #7FB3D5;
+    --str:    #A8C09A;
+    --bad:    #E0645F;
+    --good:   #74BC7E;
+
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+            "Roboto Mono", "Droid Sans Mono", Consolas, monospace;
+    --sans: "Roboto Condensed", "Helvetica Neue", Inter, system-ui, sans-serif;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #000;
+    height: 100%;
+    overflow: hidden;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    height: 100dvh;
+    display: grid;
+    place-items: center;
+    background: #000;
+  }
+
+  /* 9:16 stage. Full-bleed on a phone, letterboxed on desktop.
+     container-type lets every size below be expressed in cqw, so the
+     36-character line width holds at any viewport. */
+  .stage {
+    position: relative;
+    aspect-ratio: 9 / 16;
+    height: 100dvh;
+    max-width: 100vw;
+    background: var(--ink);
+    overflow: hidden;
+    container-type: size;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Content band: 12%–58% of frame height.
+     Above it is Instagram's top chrome, below it is the camera park. */
+  .card {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 12%;
+    height: 46%;
+    padding: 0 6cqw;
+    box-sizing: border-box;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3cqw;
+  }
+
+  .card[data-on="1"] { display: flex; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card[data-on="1"] { animation: in 120ms ease-out; }
+    @keyframes in { from { opacity: 0.35; } to { opacity: 1; } }
+  }
+
+  /* ── Display cards ── */
+
+  .claim {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 9.2cqw;
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .claim em {
+    font-style: normal;
+    color: var(--kw);
+  }
+
+  .sub {
+    font-family: var(--sans);
+    font-size: 4cqw;
+    line-height: 1.35;
+    color: var(--dim);
+    margin: 0;
+    max-width: 46ch;
+  }
+
+  /* ── Code cards ──
+     4.05cqw × 0.6em advance × 36 chars ≈ 87cqw, which is the panel's
+     inner width. Nothing wraps as long as source lines stay ≤36 chars. */
+
+  .code {
+    font-family: var(--mono);
+    font-size: 4.05cqw;
+    line-height: 1.5;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 1cqw;
+    padding: 3cqw 2cqw 3cqw 0;
+    margin: 0;
+    color: var(--fg);
+    overflow-x: auto;
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  .code .ln {
+    display: block;
+    padding: 0 2cqw 0 3cqw;
+    border-left: 0.7cqw solid transparent;
+  }
+
+  .code .ln[data-mark="bad"] {
+    background: rgba(224, 100, 95, 0.14);
+    border-left-color: var(--bad);
+  }
+
+  .code .ln[data-mark="good"] {
+    background: rgba(116, 188, 126, 0.14);
+    border-left-color: var(--good);
+  }
+
+  .kw  { color: var(--kw); }
+  .num { color: var(--num); }
+  .ty  { color: var(--str); }
+
+  .note {
+    font-family: var(--mono);
+    font-size: 3.5cqw;
+    line-height: 1.4;
+    color: var(--dim);
+    margin: 0;
+    padding-left: 0.5cqw;
+  }
+
+  .note[data-mark="bad"]  { color: var(--bad); }
+  .note[data-mark="good"] { color: var(--good); }
+
+  /* ── Ask cards ──
+     The question itself. Deliberately lighter than .claim: a question is
+     the premise of the reel, not its hook, and reads at a smaller size
+     because it is usually longer than a hook line. */
+
+  .qlabel {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 3.2cqw;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--kw);
+    margin: 0;
+  }
+
+  .ask {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 6.4cqw;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  /* ── Diagram cards ──
+     A vertical chain of nodes joined by drawn arrows. Never box-drawing
+     characters — those pick up fallback fonts on Android and break
+     alignment. Sizes below are tuned so 6 nodes plus 5 arrows (74cqw)
+     fit the 81.8cqw content band. Seven nodes clips. */
+
+  .diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    margin: 0;
+    width: 100%;
+  }
+
+  .node {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 4cqw;
+    line-height: 1.2;
+    text-align: center;
+    color: var(--fg);
+    background: var(--panel);
+    border: 0.5cqw solid var(--rule);
+    border-radius: 1.2cqw;
+    padding: 1.6cqw 2.4cqw;
+    min-width: 42cqw;
+    box-sizing: border-box;
+  }
+
+  .node[data-mark="bad"] {
+    border-color: var(--bad);
+    background: rgba(224, 100, 95, 0.14);
+    color: var(--bad);
+  }
+
+  .node[data-mark="good"] {
+    border-color: var(--good);
+    background: rgba(116, 188, 126, 0.14);
+    color: var(--good);
+  }
+
+  .node .nsub {
+    display: block;
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 2.9cqw;
+    line-height: 1.3;
+    color: var(--dim);
+  }
+
+  /* Arrow: a drawn stem plus a rotated chevron. */
+  .arrow {
+    width: 0.5cqw;
+    height: 2.6cqw;
+    background: var(--rule);
+    position: relative;
+    flex: none;
+    margin: 0.7cqw 0;
+  }
+
+  .arrow::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -0.3cqw;
+    width: 1.5cqw;
+    height: 1.5cqw;
+    border-right: 0.5cqw solid var(--rule);
+    border-bottom: 0.5cqw solid var(--rule);
+    transform: translateX(-50%) rotate(45deg);
+  }
+
+  /* One fan-out: a single node pointing to two side by side.
+     At most one .row per diagram. */
+  .row {
+    display: flex;
+    gap: 2.4cqw;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .row .node { min-width: 0; flex: 1; }
+
+  /* ── Camera park: 58%–78%, bottom-left.
+       Nothing essential is ever drawn here. Outlined only on the
+       pre-roll setup card. ── */
+
+  .park {
+    position: absolute;
+    left: 5cqw;
+    top: 60%;
+    width: 44cqw;
+    height: 15%;
+    border: 0.5cqw dashed var(--rule);
+    border-radius: 50%;
+    display: none;
+    place-items: center;
+    text-align: center;
+    font-family: var(--sans);
+    font-size: 3.4cqw;
+    line-height: 1.3;
+    color: var(--dim);
+    box-sizing: border-box;
+    padding: 2cqw;
+  }
+
+  .stage[data-card="0"] .park { display: grid; }
+
+  /* Progress dots sit in the bottom 6% — the zone Instagram's caption
+     and buttons cover, so they are visible while filming and gone
+     once posted. */
+  .dots {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 3.2%;
+    display: flex;
+    justify-content: center;
+    gap: 1.6cqw;
+  }
+
+  .dots i {
+    width: 1.5cqw;
+    height: 1.5cqw;
+    border-radius: 50%;
+    background: var(--rule);
+  }
+
+  .dots i[data-on="1"] { background: var(--dim); }
+
+  .stage[data-card="0"] .dots { visibility: hidden; }
+
+  /* Tap targets. Left third steps back so a fumble mid-take is
+     recoverable without restarting the recording. */
+  .tap {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .tap.prev { left: 0;  width: 33%; }
+  .tap.next { right: 0; width: 67%; }
+
+  .tap:focus-visible {
+    outline: 0.4cqw solid var(--kw);
+    outline-offset: -0.8cqw;
+  }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <div class="stage" id="stage" data-card="0">
+
+    <!-- Card 0 - PRE-ROLL. Always present, always exactly this. Not audience copy. -->
+    <div class="card" data-on="1">
+      <p class="claim">Park your bubble<br>bottom-left.</p>
+      <p class="sub">Start recording, then tap. Tap the left edge to step back.
+        Trim this card off in editing.</p>
+    </div>
+
+    <div class="card">
+      <p class="qlabel">DSA</p>
+      <p class="ask">Given a linked list,<br>find where the cycle<br>starts.</p>
+    </div>
+
+    <div class="card">
+      <p class="ask">List: 1 2 3 4 5.<br>Node 5 points to 3.<br>Return node 3.</p>
+    </div>
+
+    <div class="card">
+      <p class="claim">Put every node<br>in a <em>hash set</em>.</p>
+      <p class="sub">The first node you see twice is the start. O(n) time, O(n) memory.</p>
+    </div>
+
+    <div class="card">
+      <p class="claim">You paid O(n) space<br>to walk a list you<br>already have.</p>
+      <p class="sub">The follow-up is always the same one: now do it in constant space.</p>
+    </div>
+
+    <div class="card">
+      <p class="claim">A runner at twice<br>the speed always<br><em>laps</em> the other.</p>
+      <p class="sub">Same track, so the faster one has to come back around.</p>
+    </div>
+
+    <div class="card">
+      <p class="claim">The gap closes by<br>one node per step.</p>
+      <p class="sub">Fast gains exactly one node on slow every step, so it lands on slow instead of jumping past it.</p>
+    </div>
+
+    <div class="card">
+      <pre class="code"><span class="ln">slow = head</span><span class="ln">fast = head</span><span class="ln"><span class="kw">while</span> fast <span class="kw">and</span> fast.next:</span><span class="ln">    slow = slow.next</span><span class="ln">    fast = fast.next.next</span><span class="ln">    <span class="kw">if</span> slow <span class="kw">is</span> fast:</span><span class="ln">        <span class="kw">break</span></span></pre>
+    </div>
+
+    <div class="card">
+      <p class="claim">They meet inside<br>the loop, not at<br>its entrance.</p>
+      <p class="sub">So the meeting point is not the answer yet.</p>
+    </div>
+
+    <div class="card">
+      <pre class="code"><span class="ln" data-mark="good">slow = head</span><span class="ln"><span class="kw">while</span> slow <span class="kw">is</span> <span class="kw">not</span> fast:</span><span class="ln">    slow = slow.next</span><span class="ln">    fast = fast.next</span><span class="ln"><span class="kw">return</span> slow</span></pre>
+      <p class="note" data-mark="good">Send slow back to the head.<br>Now both move one step.</p>
+    </div>
+
+    <div class="card">
+      <p class="claim">Same O(n) time.<br><em>O(1)</em> space now.</p>
+      <p class="sub">Two pointers replace the whole hash set.</p>
+    </div>
+
+    <div class="card">
+      <p class="claim">Can you reason<br>about pointers<br>without a set?</p>
+      <p class="sub">Cracking the Coding Interview, problem 2.8, Loop Detection.</p>
+    </div>
+
+    <div class="park">bubble<br>here</div>
+
+    <div class="dots" id="dots"></div>
+
+    <button class="tap prev" id="prev" aria-label="Previous card"></button>
+    <button class="tap next" id="next" aria-label="Next card"></button>
+  </div>
+</div>
+
+<script>
+  var stage = document.getElementById('stage');
+  var cards = stage.querySelectorAll('.card');
+  var dots  = document.getElementById('dots');
+  var i = 0;
+
+  // One dot per audience card — card 0 is pre-roll and isn't counted.
+  for (var d = 1; d < cards.length; d++) {
+    dots.appendChild(document.createElement('i'));
+  }
+  var pips = dots.querySelectorAll('i');
+
+  function show(n) {
+    i = Math.max(0, Math.min(cards.length - 1, n));
+    for (var c = 0; c < cards.length; c++) {
+      if (c === i) { cards[c].setAttribute('data-on', '1'); }
+      else { cards[c].removeAttribute('data-on'); }
+    }
+    for (var p = 0; p < pips.length; p++) {
+      if (p < i) { pips[p].setAttribute('data-on', '1'); }
+      else { pips[p].removeAttribute('data-on'); }
+    }
+    stage.setAttribute('data-card', String(i));
+  }
+
+  document.getElementById('next').addEventListener('click', function () { show(i + 1); });
+  document.getElementById('prev').addEventListener('click', function () { show(i - 1); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); show(i + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); show(i - 1); }
+  });
+
+  show(0);
+</script>
+</body>
+</html>
