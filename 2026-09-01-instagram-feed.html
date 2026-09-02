@@ -237,6 +237,29 @@
     stroke: none;
   }
 
+  .picture {
+    display: block;
+    width: 22cqw;
+    height: 22cqw;
+    margin: 0 auto;
+  }
+
+  .picture svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: var(--kw);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .picture svg .dot {
+    fill: var(--kw);
+    stroke: none;
+  }
+
   .arrow {
     width: 0.5cqw;
     height: 2.6cqw;
@@ -374,8 +397,9 @@
       <p class="claim">You'd miss posts<br>from people you<br>care about most.</p>
     </div>
 
-    <!-- Card 6 - THE TURN -->
+    <!-- Card 6 - THE TURN, PICTURE card -->
     <div class="card">
+      <span class="picture"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><line x1="15" y1="15" x2="21" y2="21"/></svg></span>
       <p class="claim">Each post gets<br>scored on your<br>odds of engaging.</p>
     </div>
 
